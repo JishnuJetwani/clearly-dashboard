@@ -20,14 +20,12 @@ function withDefaults(raw: any): Candidate {
   (c as any).stage = c.stage ?? "INTAKE";
   (c as any).status = (c as any).status ?? "NEW";
 
-  // ✅ New replacement for risk (back-compat)
   (c as any).humanCheckNeeded = (c as any).humanCheckNeeded ?? false;
   (c as any).humanCheckReasons = (c as any).humanCheckReasons ?? [];
 
   // Tasks default (in case older docs are missing any keys)
   (c as any).tasks = c.tasks ?? {
     intakeForm: "NOT_STARTED",
-    employmentVerification: "NOT_STARTED",
     referralContacted: "NOT_STARTED",
     referralResponses: "NOT_STARTED",
     backgroundCheck: "NOT_STARTED",
@@ -101,7 +99,6 @@ export async function addCandidateDb(input: {
   backgroundCheck: "NOT_STARTED",
 },
 
-    // ✅ new field replacing risk
     humanCheckNeeded: false,
     humanCheckReasons: [],
 

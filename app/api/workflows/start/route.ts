@@ -58,12 +58,12 @@ export async function POST(req: Request) {
     stage: "INTAKE",
     tasks: {
       intakeForm: "WAITING",
-      employmentVerification: "NOT_STARTED",
       referralContacted: "NOT_STARTED",
       referralResponses: "NOT_STARTED",
       backgroundCheck: "NOT_STARTED",
     },
-    risk: { score: 10, flags: [] },
+    humanCheckNeeded: false,
+    humanCheckReasons: [],
     activity: [{ at: now, label: "Candidate added; referral request email sent" }],
     messages: [
       { at: now, channel: "email", subject: "Provide your referral’s info", status: "sent" },

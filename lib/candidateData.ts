@@ -27,35 +27,46 @@ export function getCandidateById(id: string): Candidate | null {
 export function addCandidate(input: { fullName: string; email: string }): Candidate {
   const now = new Date().toISOString();
 
-  const newCandidate: Candidate = {
-    id: makeId(),
-    fullName: input.fullName,
-    email: input.email,
-    roleApplied: "Prospect",
-    createdAt: now,
-    lastActivityAt: now,
-    stage: "INTAKE",
-    tasks: {
-      intakeForm: "WAITING",
-      employmentVerification: "NOT_STARTED",
-      referralContacted: "NOT_STARTED",
-      referralResponses: "NOT_STARTED",
-      backgroundCheck: "NOT_STARTED",
+const newCandidate: Candidate = {
+  id: makeId(),
+  fullName: input.fullName,
+  email: input.email,
+  roleApplied: "Prospect",
+  createdAt: now,
+  lastActivityAt: now,
+
+  stage: "INTAKE",
+
+  tasks: {
+    intakeForm: "WAITING",
+    referralContacted: "NOT_STARTED",
+    referralResponses: "NOT_STARTED",
+    backgroundCheck: "NOT_STARTED",
+  },
+
+  humanCheckNeeded: false,
+  humanCheckReasons: [],
+
+  status: "INTAKE",
+
+  referenceCall: {
+    verdict: "UNKNOWN",
+  },
+
+  activity: [
+    { at: now, label: "Prospect added by employer" },
+    { at: now, label: "Intake email queued" },
+  ],
+  messages: [
+    {
+      at: now,
+      channel: "email",
+      subject: "Request: reference details",
+      status: "sent",
     },
-    risk: { score: 10, flags: [] },
-    activity: [
-      { at: now, label: "Prospect added by employer" },
-      { at: now, label: "Intake email queued" },
-    ],
-    messages: [
-      {
-        at: now,
-        channel: "email",
-        subject: "Request: reference details",
-        status: "sent",
-      },
-    ],
-  };
+  ],
+};
+
 
   // mutate in place so everyone sees the same array instance
   candidates.unshift(newCandidate);
