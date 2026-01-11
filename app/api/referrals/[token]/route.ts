@@ -33,32 +33,37 @@ export async function POST(
     );
   }
 
+  const candidateId = String(candidate._id);
   const now = new Date().toISOString();
 
   // 1) Store referral info + advance status
-await candidates.updateOne(
-  { referralToken: token },
-  {
-    $set: {
-      referral: { name: refName || "", phone: refPhone, email: refEmail || "" },
-      status: "REFERRALS_SUBMITTED",
-      lastActivityAt: now,
-    },
-    $push: ({
-      activity: { $each: [{ at: now, label: "Referral info submitted" }] },
-    } as any),
-  }
-);
+  await candidates.updateOne(
+    { referralToken: token },
+    {
+      $set: {
+        referral: { name: refName || "", phone: refPhone, email: refEmail || "" },
+        status: "INTAKE_COMPLETED",
+        lastActivityAt: now,
+      },
+      $push: {
+        activity: { $each: [{ at: now, label: "Referral info submitted" }] },
+      } as any,
+    }
+  );
 
-  // 2) Trigger Vapi call by calling your existing Next route
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-  const callRes = await fetch(`${baseUrl}/api/vapi/start-reference-call`, {
+  // 2) Trigger Vapi call via your existing Next route
+  const origin = new URL(req.url).origin;
+
+  const callRes = await fetch(`${origin}/api/vapi/start-reference-call`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
+      candidateId,                       // ✅ NEW
       candidateName: candidate.fullName,
       companyName: candidate.companyName || "Company",
       referencePhone: refPhone,
+      referenceName: refName || "",
+      referenceEmail: refEmail || "",
     }),
   });
 
@@ -81,20 +86,20 @@ await candidates.updateOne(
   }
 
   // 3) Store callId + advance status
-await candidates.updateOne(
-  { referralToken: token },
-  {
-    $set: {
-      status: "CALL_IN_PROGRESS",
-      "vapi.callId": callId,
-      lastActivityAt: now,
-    },
-    $push: ({
-      activity: { $each: [{ at: now, label: `Reference call started (callId: ${callId})` }] },
-    } as any),
-  }
-);
-
+  await candidates.updateOne(
+    { referralToken: token },
+    {
+      $set: {
+        status: "REF_CALL_IN_PROGRESS",
+        "vapi.callId": callId,
+        "vapi.referencePhone": refPhone,
+        lastActivityAt: now,
+      },
+      $push: {
+        activity: { $each: [{ at: now, label: `Reference call started (callId: ${callId})` }] },
+      } as any,
+    }
+  );
 
   return NextResponse.json({ success: true, callId });
 }

@@ -21,6 +21,16 @@ export async function POST(req: Request) {
   if (!email || !email.includes("@"))
     return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
 
-  const created = await addCandidateDb({ fullName, email });
+  const now = new Date().toISOString();
+
+  // Initialize timeline + stage tracking at creation time
+  const created = await addCandidateDb({
+    fullName,
+    email,
+    status: "INTAKE_SENT",
+    lastActivityAt: now,
+    activity: [{ at: now, label: "Candidate created (intake sent)" }],
+  } as any);
+
   return NextResponse.json(created, { status: 201 });
 }

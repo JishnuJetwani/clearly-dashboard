@@ -12,9 +12,15 @@ const vapi = new VapiClient({
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => null);
-    const { candidateName, companyName, referencePhone } = body ?? {};
+    const {
+      candidateId,        // ✅ NEW
+      candidateName,
+      companyName,
+      referencePhone,
+      referenceName,
+      referenceEmail,
+    } = body ?? {};
 
-    // Basic validation
     if (!candidateName || !companyName || !referencePhone) {
       return NextResponse.json(
         { error: "Missing candidateName, companyName, or referencePhone" },
@@ -22,12 +28,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Env validation
-    if (
-      !process.env.VAPI_API_KEY ||
-      !process.env.VAPI_PHONE_NUMBER_ID ||
-      !process.env.VAPI_ASSISTANT_ID
-    ) {
+    if (!process.env.VAPI_API_KEY || !process.env.VAPI_PHONE_NUMBER_ID || !process.env.VAPI_ASSISTANT_ID) {
       return NextResponse.json(
         { error: "Server is missing VAPI env vars" },
         { status: 500 }
@@ -40,13 +41,16 @@ export async function POST(req: Request) {
       assistantId: process.env.VAPI_ASSISTANT_ID,
       assistantOverrides: {
         variableValues: {
+          candidate_id: candidateId || "",          // ✅ NEW (critical)
           candidate_name: candidateName,
           company_name: companyName,
+          reference_name: referenceName || "",
+          reference_email: referenceEmail || "",
+          reference_phone: referencePhone,
         },
       },
     });
 
-    // SDK typing can vary by version; extract call id safely
     const callId =
       (result as any)?.id ??
       (result as any)?.callId ??
