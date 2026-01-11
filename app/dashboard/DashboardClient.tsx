@@ -9,33 +9,35 @@ type StageFilter = Stage | "ALL";
 
 function needsAction(c: Candidate) {
   const vals = Object.values(c.tasks);
+  // keep this logic: waiting/failed items should show "Needs action"
   return vals.includes("FAILED") || vals.includes("WAITING");
 }
 
 export default function DashboardClient({ initialRows }: { initialRows: Candidate[] }) {
-  // Keep a live copy so the dashboard updates after new candidates are created.
   const [rows, setRows] = useState<Candidate[]>(initialRows);
   const [query, setQuery] = useState("");
   const [stage, setStage] = useState<StageFilter>("ALL");
   const [onlyNeedsAction, setOnlyNeedsAction] = useState(false);
 
-  // Hydration-safe refresh: after navigation back from /candidates/new, fetch the
-  // current list. This also makes the dashboard resilient even if server
-  // rendering gets cached by the framework.
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+
+    async function refresh() {
       try {
         const res = await fetch("/api/candidates", { cache: "no-store" });
         if (!res.ok) return;
         const data = (await res.json()) as Candidate[];
         if (!cancelled) setRows(data);
       } catch {
-        // ignore; we'll just keep initial rows
+        // ignore
       }
-    })();
+    }
+
+    refresh();
+    const t = setInterval(refresh, 4000);
     return () => {
       cancelled = true;
+      clearInterval(t);
     };
   }, []);
 
@@ -43,8 +45,8 @@ export default function DashboardClient({ initialRows }: { initialRows: Candidat
     const total = rows.length;
     const action = rows.filter(needsAction).length;
     const flagged = rows.filter((c) => c.stage === "FLAGGED").length;
-    const highRisk = rows.filter((c) => c.risk.score >= 67).length;
-    return { total, action, flagged, highRisk };
+    const humanCheck = rows.filter((c) => c.humanCheckNeeded).length;
+    return { total, action, flagged, humanCheck };
   }, [rows]);
 
   const filtered = useMemo(() => {
@@ -60,24 +62,29 @@ export default function DashboardClient({ initialRows }: { initialRows: Candidat
     if (onlyNeedsAction) current = current.filter(needsAction);
 
     return [...current].sort((a, b) => {
+      // 1) Flagged first
       const aFlag = a.stage === "FLAGGED" ? 1 : 0;
       const bFlag = b.stage === "FLAGGED" ? 1 : 0;
       if (aFlag !== bFlag) return bFlag - aFlag;
 
+      // 2) Human check needed next
+      const aHC = a.humanCheckNeeded ? 1 : 0;
+      const bHC = b.humanCheckNeeded ? 1 : 0;
+      if (aHC !== bHC) return bHC - aHC;
+
+      // 3) Needs action next
       const aNeed = needsAction(a) ? 1 : 0;
       const bNeed = needsAction(b) ? 1 : 0;
       if (aNeed !== bNeed) return bNeed - aNeed;
 
-      if (a.risk.score !== b.risk.score) return b.risk.score - a.risk.score;
-
-      return new Date(a.lastActivityAt).getTime() - new Date(b.lastActivityAt).getTime();
+      // 4) Most recently active first
+      return new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime();
     });
   }, [rows, query, stage, onlyNeedsAction]);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-white">
       <div className="max-w-6xl mx-auto p-6 space-y-4">
-        {/* Hero header */}
         <div className="rounded-3xl border border-slate-200 bg-white/70 backdrop-blur shadow-sm p-6 overflow-hidden relative">
           <div
             className="absolute inset-0 pointer-events-none opacity-[0.35]"
@@ -95,11 +102,10 @@ export default function DashboardClient({ initialRows }: { initialRows: Candidat
                 Employer Dashboard
               </h1>
               <p className="mt-1 text-sm text-slate-600">
-                Triage candidates across intake, verification, referrals, and decisions — fast.
+                Track candidates across intake, verification, referrals, and decisions.
               </p>
             </div>
 
-            {/* RIGHT SIDE: count + add button */}
             <div className="flex items-center gap-3">
               <div className="text-sm text-slate-600">
                 Showing{" "}
@@ -118,15 +124,13 @@ export default function DashboardClient({ initialRows }: { initialRows: Candidat
           </div>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label="Total" value={stats.total} tone="slate" icon="👥" />
-          <StatCard label="Needs action" value={stats.action} tone="amber" icon="⚡" />
-          <StatCard label="Flagged" value={stats.flagged} tone="rose" icon="🚩" />
-          <StatCard label="High risk" value={stats.highRisk} tone="violet" icon="🛡️" />
+          <StatCard label="Total" value={stats.total} tone="slate" />
+          <StatCard label="Needs action" value={stats.action} tone="amber" />
+          <StatCard label="Flagged" value={stats.flagged} tone="rose" />
+          <StatCard label="Human check" value={stats.humanCheck} tone="violet" />
         </div>
 
-        {/* Filters */}
         <div className="rounded-3xl border border-slate-200 bg-white shadow-sm p-4">
           <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
             <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
@@ -149,7 +153,6 @@ export default function DashboardClient({ initialRows }: { initialRows: Candidat
               >
                 <option value="ALL">All stages</option>
                 <option value="INTAKE">INTAKE</option>
-                <option value="EMPLOYMENT_VERIFY">EMPLOYMENT VERIFY</option>
                 <option value="REFERRAL_OUTREACH">REFERRAL OUTREACH</option>
                 <option value="BACKGROUND_CHECK">BACKGROUND CHECK</option>
                 <option value="DECISION">DECISION</option>
@@ -179,32 +182,28 @@ export default function DashboardClient({ initialRows }: { initialRows: Candidat
 function StatCard({
   label,
   value,
-  icon,
   tone,
 }: {
   label: string;
   value: number;
-  icon: string;
   tone: "slate" | "amber" | "rose" | "violet";
 }) {
-  const tones: Record<typeof tone, { bg: string; ring: string; text: string }> = {
-    slate: { bg: "from-slate-50 to-white", ring: "ring-slate-200", text: "text-slate-900" },
-    amber: { bg: "from-amber-50 to-white", ring: "ring-amber-200", text: "text-amber-900" },
-    rose: { bg: "from-rose-50 to-white", ring: "ring-rose-200", text: "text-rose-900" },
-    violet: { bg: "from-violet-50 to-white", ring: "ring-violet-200", text: "text-violet-900" },
+  const tones: Record<typeof tone, { ring: string; dot: string }> = {
+    slate: { ring: "ring-slate-200", dot: "bg-slate-900" },
+    amber: { ring: "ring-amber-200", dot: "bg-amber-500" },
+    rose: { ring: "ring-rose-200", dot: "bg-rose-600" },
+    violet: { ring: "ring-violet-200", dot: "bg-violet-600" },
   };
 
   return (
-    <div
-      className={`rounded-3xl border border-slate-200 bg-gradient-to-b ${tones[tone].bg} shadow-sm p-4`}
-    >
+    <div className="rounded-3xl border border-slate-200 bg-white shadow-sm p-4">
       <div className="flex items-center justify-between">
         <div className="text-xs text-slate-600">{label}</div>
         <div className={`h-9 w-9 rounded-2xl grid place-items-center ring-1 ${tones[tone].ring}`}>
-          <span className="text-sm">{icon}</span>
+          <span className={`h-2.5 w-2.5 rounded-full ${tones[tone].dot}`} />
         </div>
       </div>
-      <div className={`mt-2 text-2xl font-semibold tracking-tight ${tones[tone].text}`}>
+      <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 tabular-nums">
         {value}
       </div>
     </div>

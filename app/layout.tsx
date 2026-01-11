@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import SplashIntro from "@/components/SplashIntro";
 
 export const metadata: Metadata = {
   title: "HR Agent Dashboard",
@@ -14,6 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
+        <SplashIntro />
         {children}
       </body>
     </html>

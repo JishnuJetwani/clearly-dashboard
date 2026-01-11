@@ -12,6 +12,36 @@ function toPlain<T extends Record<string, any>>(doc: any): T {
   return plain as T;
 }
 
+function withDefaults(raw: any): Candidate {
+  const c = raw as Candidate;
+
+  // Back-compat defaults so UI never breaks on older docs
+  (c as any).roleApplied = c.roleApplied ?? "Prospect";
+  (c as any).stage = c.stage ?? "INTAKE";
+  (c as any).status = (c as any).status ?? "NEW";
+
+  // ✅ New replacement for risk (back-compat)
+  (c as any).humanCheckNeeded = (c as any).humanCheckNeeded ?? false;
+  (c as any).humanCheckReasons = (c as any).humanCheckReasons ?? [];
+
+  // Tasks default (in case older docs are missing any keys)
+  (c as any).tasks = c.tasks ?? {
+    intakeForm: "NOT_STARTED",
+    employmentVerification: "NOT_STARTED",
+    referralContacted: "NOT_STARTED",
+    referralResponses: "NOT_STARTED",
+    backgroundCheck: "NOT_STARTED",
+  };
+
+  (c as any).activity = (c as any).activity ?? [];
+  (c as any).messages = (c as any).messages ?? [];
+
+  // If old docs still have risk, ignore it (we’re not using it anymore)
+  if ((c as any).risk) delete (c as any).risk;
+
+  return c;
+}
+
 export async function listCandidatesDb(): Promise<Candidate[]> {
   const client = await clientPromise;
   const db = client.db();
@@ -25,11 +55,14 @@ export async function listCandidatesDb(): Promise<Candidate[]> {
   return rows.map((r) => {
     const c = toPlain<Candidate & { id?: string }>(r);
 
-    // safety: if an older doc doesn't have id, generate one and persist it
+    // safety: if an older doc doesn't have id, generate one (UI uses /candidates/[id])
     if (!c.id) {
       c.id = makeId();
+      // NOTE: we do NOT persist this here (no _id available after toPlain delete)
+      // If you want persistence, do it in a migration script.
     }
-    return c as Candidate;
+
+    return withDefaults(c);
   });
 }
 
@@ -40,7 +73,8 @@ export async function getCandidateByIdDb(id: string): Promise<Candidate | null> 
   const row = await db.collection("candidates").findOne({ id });
   if (!row) return null;
 
-  return toPlain<Candidate>(row);
+  const c = toPlain<Candidate>(row);
+  return withDefaults(c);
 }
 
 export async function addCandidateDb(input: {
@@ -49,22 +83,28 @@ export async function addCandidateDb(input: {
 }): Promise<Candidate> {
   const now = new Date().toISOString();
 
-  const newCandidate: Candidate = {
+  const newCandidate: any = {
     id: makeId(),
     fullName: input.fullName,
     email: input.email,
     roleApplied: "Prospect",
     createdAt: now,
     lastActivityAt: now,
+
     stage: "INTAKE",
+    status: "NEW",
+
     tasks: {
-      intakeForm: "WAITING",
-      employmentVerification: "NOT_STARTED",
-      referralContacted: "NOT_STARTED",
-      referralResponses: "NOT_STARTED",
-      backgroundCheck: "NOT_STARTED",
-    },
-    risk: { score: 10, flags: [] },
+  intakeForm: "WAITING",
+  referralContacted: "NOT_STARTED",
+  referralResponses: "NOT_STARTED",
+  backgroundCheck: "NOT_STARTED",
+},
+
+    // ✅ new field replacing risk
+    humanCheckNeeded: false,
+    humanCheckReasons: [],
+
     activity: [
       { at: now, label: "Prospect added by employer" },
       { at: now, label: "Intake email queued" },
@@ -76,7 +116,7 @@ export async function addCandidateDb(input: {
 
   const client = await clientPromise;
   const db = client.db();
-  await db.collection("candidates").insertOne(newCandidate as any);
+  await db.collection("candidates").insertOne(newCandidate);
 
-  return newCandidate;
+  return withDefaults(newCandidate);
 }

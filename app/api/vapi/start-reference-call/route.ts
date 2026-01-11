@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => null);
     const {
-      candidateId,        // ✅ NEW
+      candidateId,
       candidateName,
       companyName,
       referencePhone,
@@ -29,10 +29,7 @@ export async function POST(req: Request) {
     }
 
     if (!process.env.VAPI_API_KEY || !process.env.VAPI_PHONE_NUMBER_ID || !process.env.VAPI_ASSISTANT_ID) {
-      return NextResponse.json(
-        { error: "Server is missing VAPI env vars" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Server is missing VAPI env vars" }, { status: 500 });
     }
 
     const result = await vapi.calls.create({
@@ -41,7 +38,7 @@ export async function POST(req: Request) {
       assistantId: process.env.VAPI_ASSISTANT_ID,
       assistantOverrides: {
         variableValues: {
-          candidate_id: candidateId || "",          // ✅ NEW (critical)
+          candidate_id: candidateId || "",
           candidate_name: candidateName,
           company_name: companyName,
           reference_name: referenceName || "",
@@ -58,10 +55,7 @@ export async function POST(req: Request) {
       (result as any)?.data?.id;
 
     if (!callId) {
-      return NextResponse.json(
-        { error: "Vapi did not return a call id", raw: result },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Vapi did not return a call id", raw: result }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, callId });
