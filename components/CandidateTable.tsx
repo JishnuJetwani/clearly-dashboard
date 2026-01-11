@@ -25,11 +25,10 @@ function stageChip(stage: Stage) {
     case "DECISION":
       return "bg-indigo-50 text-indigo-800 ring-indigo-200";
     case "BACKGROUND_CHECK":
-      return "bg-sky-50 text-sky-800 ring-sky-200";
+      return "bg-amber-50 text-amber-900 ring-amber-200";
     case "REFERRAL_OUTREACH":
       return "bg-violet-50 text-violet-800 ring-violet-200";
-    case "EMPLOYMENT_VERIFY":
-      return "bg-amber-50 text-amber-900 ring-amber-200";
+    case "INTAKE":
     default:
       return "bg-slate-50 text-slate-700 ring-slate-200";
   }
@@ -93,9 +92,7 @@ export default function CandidateTable({ rows }: { rows: Candidate[] }) {
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-slate-500 truncate">
-                          {c.roleApplied || "—"}
-                        </div>
+                        <div className="text-xs text-slate-500 truncate">{c.roleApplied || "—"}</div>
                         <div className="text-xs text-slate-400 truncate">{c.email}</div>
                       </div>
                     </div>
@@ -144,9 +141,7 @@ export default function CandidateTable({ rows }: { rows: Candidate[] }) {
                     )}
                   </td>
 
-                  <td className="px-5 py-4 text-xs text-slate-600 tabular-nums">
-                    {fmtUTC(c.lastActivityAt)}
-                  </td>
+                  <td className="px-5 py-4 text-xs text-slate-600 tabular-nums">{fmtUTC(c.lastActivityAt)}</td>
 
                   <td className="px-5 py-4 text-right">
                     <Link
